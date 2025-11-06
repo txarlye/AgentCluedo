@@ -53,6 +53,7 @@ class Settings:
         self.main_name      = config_main.get("name")
         self.agentes        = config_agentes.get("ia_agente_texto")
         self.ollama_model   = config_agentes.get("ia_ollama_model")
+        self.prompt_path    = config_agentes.get("prompt_path")
         
         
         

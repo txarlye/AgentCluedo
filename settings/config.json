@@ -6,7 +6,8 @@
   },
   "Agentes": {
     "ia_agente_texto": "ollama",
-    "ia_ollama_model": "gemma3:4b",
-    "ia_agente_imagen": "stable-diffusion"
+    "ia_ollama_model": "llama3.1:8b",
+    "ia_agente_imagen": "stable-diffusion",
+    "prompt_path": "agents/prompts/"
     }
 }
