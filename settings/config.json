@@ -1,0 +1,12 @@
+{
+  "main": {
+    "name": "AgentCluedo",
+    "version": "0.1.0",
+    "description": "AgentCluedo es un juego de misterio interactivo donde un asesinato ha ocurrido en una mansión aislada. Hay un detective, varios sospechosos y un \"Director de Juego\" (que sabe la verdad). Todos son agentes de IA (LLMs) gestionados por LangChain, y el objetivo del jugador humano es observar o, si lo prefiere, tomar el rol del detective."
+  },
+  "Agentes": {
+    "ia_agente_texto": "ollama",
+    "ia_ollama_model": "gemma3:4b",
+    "ia_agente_imagen": "stable-diffusion"
+    }
+}
