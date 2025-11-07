@@ -5,7 +5,9 @@ from .agent_response import AgentResponse
 
 class AgenteBase:
     """
-    Este agente no sabe nada de los inputs y los print
+    Este agente no sabe nada de los inputs y los print. 
+    Es un agente pasivo: le das una entrada y te da una salida estructurada
+    Si fuera reactivo le daríamos un objetivo
     solo sabe "pensar" (invoke)
     """
     def __init__(self, nombre:str, rol_prompt: str,llm: BaseChatModel):
