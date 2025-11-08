@@ -123,7 +123,7 @@ class GameManager:
             return f"Has acusado a {sospechoso}. Es inocente. ¡HAS PERDIDO!"
 
     # --- MÉTODO PARA CORRER EL JUEGO ---
-    def run_game(self):
+    def run_minigame1(self):
         print("\n--- ¡Comienza el Juego! ---")
         objetivo = """
         Ha habido un asesinato en la mansión. 
@@ -143,3 +143,63 @@ class GameManager:
         print("\n--- Respuesta Final del Detective ---")
         print(resultado["output"])
         print("--- Juego Terminado ---")
+        
+    def run_game(self):
+        """
+        Inicia el bucle de juego principal.
+        """
+        print("\n--- ¡Comienza el Juego! ---")
+        print("Ha habido un asesinato en la mansión.")
+        print("La víctima es Lord Alistair.")
+        print("Los sospechosos son 'Mayordomo' y 'Heredera'.")
+        print("Tú eres el Detective. Escribe tus órdenes.")
+        print("Escribe 'exit' para terminar el juego.")
+        print("---" * 10)
+
+        # El bucle de juego principal
+        while True:
+            try:
+                human_input = input("Tú (Detective): ")
+                
+                if human_input.lower() == 'exit':
+                    print("Saliendo del juego. ¡Adiós!")
+                    break
+
+                # 1. Ejecutamos al agente
+                resultado = self.detective.invoke({
+                    "input": human_input,
+                    "chat_history": self.chat_history
+                })
+                
+                ai_response = resultado["output"]
+                
+                # --- ¡NUEVA LÓGICA DE IMPRESIÓN! ---
+                
+                # 2. Imprimimos el DIÁLOGO/OBSERVACIÓN real (para el jugador)
+                if "intermediate_steps" in resultado and resultado["intermediate_steps"]:
+                    print("\n--- Diálogo/Observaciones ---")
+                    for action, observation in resultado["intermediate_steps"]:
+                        # 'observation' es el string que devuelven tus herramientas
+                        # ej: "Respuesta de Mayordomo: Estaba en mi habitación..."
+                        print(f"{observation}\n")
+                
+                # 3. Imprimimos el pensamiento final del Detective
+                print("--- Pensamiento del Detective ---")
+                print(ai_response)
+                print("---" * 10)
+                
+                # --- FIN DE NUEVA LÓGICA ---
+
+                
+                # 4. ACTUALIZAMOS LA MEMORIA
+                self.chat_history.append(HumanMessage(content=human_input))
+                self.chat_history.append(AIMessage(content=ai_response))
+                
+            except EOFError:
+                print("\nSaliendo del juego. ¡Adiós!")
+                break
+            except KeyboardInterrupt:
+                print("\nSaliendo del juego. ¡Adiós!")
+                break
+        
+        

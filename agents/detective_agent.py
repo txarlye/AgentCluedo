@@ -28,7 +28,8 @@ def crear_agente_detective(llm: BaseChatModel, tools_list: List) -> AgentExecuto
     agent_executor = AgentExecutor(
         agent   = agent,
         tools   = tools_list,
-        verbose = True 
+        verbose = False ,
+        return_intermediate_steps=True
     )
     
     return agent_executor

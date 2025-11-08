@@ -1,54 +1,45 @@
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.messages import HumanMessage, AIMessage
 from .agent_response import AgentResponse
+from langchain_core.prompts import ChatPromptTemplate  
+import json
 
 class AgenteBase:
     """
-    Este agente no sabe nada de los inputs y los print. 
-    Es un agente pasivo: le das una entrada y te da una salida estructurada
-    Si fuera reactivo le daríamos un objetivo
-    solo sabe "pensar" (invoke)
+    La clase base para todos nuestros agentes del juego (Sospechosos).
     """
-    def __init__(self, nombre:str, rol_prompt: str,llm: BaseChatModel):
+    def __init__(self, nombre: str, rol_prompt: str, llm: BaseChatModel):
         self.nombre = nombre
-        self.llm = llm
         
-        # 1. configurar el Parser
-        self.parser = PydanticOutputParser(pydantic_object = AgentResponse)
-        # 2. obtener las instrucciones de formato
-        format_instructions = self.parser.get_format_instructions()
-        prompt_con_formato = f"""{rol_prompt} 
-        {format_instructions}"""
-        
-        self.system_message = SystemMessage(content = prompt_con_formato)
+        # 1. Creamos un prompt template (más robusto)
+        #    (Ya no necesitamos las 'format_instructions' manuales)
+        self.prompt = ChatPromptTemplate.from_messages([
+            ("system", rol_prompt + "\n\nResponde SIEMPRE usando la estructura JSON solicitada."),
+            ("placeholder", "{history}"),
+            ("human", "{input}")
+        ])
+        self.chain = self.prompt | llm.with_structured_output(AgentResponse)
     
-    def invoke(self, entrada: str, 
-               history: list[HumanMessage | AIMessage]) -> AgentResponse:
+    def invoke(self, entrada: str, history: list[HumanMessage | AIMessage]) -> AgentResponse:
         """
-        Llama al agente para generar respuesta estructurada
+        Llama al agente para que genere una respuesta estructurada.
         """
-        print(f" DEBUG: Agente '{self.nombre}' está pensando con {len(history)} mensajes en memoria...")
-         
-        # Creamos los mensajes para la llamada
-        # 1. su personalidad
-        # 2. la entrada humana del otro agente
-        # más adelante los mensajes de la memoria
-        mensajes = [self.system_message] + history + [HumanMessage(content=entrada)]
-        
-        # llamamos al LLM
-        respuesta_llm = self.llm.invoke(mensajes)
+        print(f"DEBUG: Agente '{self.nombre}' está pensando (con {len(history)} mensajes en memoria)...")
         
         try:
-            # respuesta_llm.content es el string JSON (ej. '{"dialogo": "...", "accion": "..."}')
-            respuesta_parseada = self.parser.parse(respuesta_llm.content)
-            return respuesta_parseada
+            # 3. Invocamos la CADENA, no el LLM directamente
+            respuesta = self.chain.invoke({
+                "history": history,
+                "input": entrada
+            })
+            # 'respuesta' ya es un objeto AgentResponse validado
+            return respuesta
+        
         except Exception as e:
+            # Capturamos cualquier error de validación
             print(f"ERROR: No se pudo parsear la respuesta de {self.nombre}. Error: {e}")
-            print(f"Respuesta cruda: {respuesta_llm.content}")
-            # Devolvemos un objeto de emergencia
             return AgentResponse(
-                dialogo="Error: No pude procesar mi respuesta.", 
+                dialogo="Error: No pude procesar mi respuesta. (Fallo de parseo)", 
                 accion="mira confundido"
             )
         
