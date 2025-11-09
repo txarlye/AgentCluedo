@@ -122,7 +122,7 @@ class GameManager:
         else:
             return f"Has acusado a {sospechoso}. Es inocente. ¡HAS PERDIDO!"
 
-    # --- MÉTODO PARA CORRER EL JUEGO ---
+    
     def run_minigame1(self):
         print("\n--- ¡Comienza el Juego! ---")
         objetivo = """
@@ -173,8 +173,6 @@ class GameManager:
                 
                 ai_response = resultado["output"]
                 
-                # --- ¡NUEVA LÓGICA DE IMPRESIÓN! ---
-                
                 # 2. Imprimimos el DIÁLOGO/OBSERVACIÓN real (para el jugador)
                 if "intermediate_steps" in resultado and resultado["intermediate_steps"]:
                     print("\n--- Diálogo/Observaciones ---")
@@ -187,8 +185,6 @@ class GameManager:
                 print("--- Pensamiento del Detective ---")
                 print(ai_response)
                 print("---" * 10)
-                
-                # --- FIN DE NUEVA LÓGICA ---
 
                 
                 # 4. ACTUALIZAMOS LA MEMORIA
