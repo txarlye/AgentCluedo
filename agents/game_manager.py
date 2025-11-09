@@ -55,21 +55,18 @@ class GameManager:
         }
         
         herramientas_reales = [
-            # ¡Cambiamos 'Tool' por 'StructuredTool'!
             StructuredTool(
                 name="interrogar",
                 func=self.interrogar, 
                 description="Usa esta herramienta para interrogar a un sospechoso. Especifica el nombre (ej: 'Mayordomo', 'Heredera') y la pregunta.",
                 args_schema=InterrogarArgs
             ),
-            # ¡Cambiamos 'Tool' por 'StructuredTool'!
             StructuredTool(
                 name="buscar_pista",
                 func=self.buscar_pista,
                 description="Usa esta herramienta para buscar pistas en una ubicación específica de la mansión (ej: 'biblioteca', 'cocina', 'habitación de la víctima').",
                 args_schema=BuscarPistaArgs
             ),
-            # ¡Cambiamos 'Tool' por 'StructuredTool'!
             StructuredTool(
                 name="acusar",
                 func=self.acusar,
