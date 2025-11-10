@@ -190,7 +190,7 @@ GameManager (Modificado): El método run_game() se convierte en un bucle while T
 
 self.chat_history: El input() del jugador y la output del agente se añaden a esta lista en cada turno. Al pasar self.chat_history al .invoke() del detective, le damos memoria a largo plazo de toda la investigación.
 
-### 🐞 Diario de Depuración (Nuestros Bugs Más Importantes)
+### 🐞 Diario de Depuración 
 ImportError: cannot import 'create_react_agent':
 
 Causa: Nuestra caché de uv/pip tenía una versión antigua de langchain (1.x) que entraba en conflicto con la nueva arquitectura (0.2.x).
