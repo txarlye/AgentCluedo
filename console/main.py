@@ -1,28 +1,20 @@
 from settings.settings import settings
-from UI.console.console_base import ConsoleBase
-from agents.llm_factory import get_llm
-from UI.console.chat_bot import Bot
-from agents.utils.prompt_loader import load_prompt
-from agents.bases.base_agent import AgenteBase
-from minigames.game_2_agentes_hablando import dos_agentes_hablando
-from minigames.game_3_detective_autonomo import probar_detective
-from agents.game_manager import GameManager
+from cluedo_engine.llm_factory import get_llm
+from cluedo_engine.game_manager import GameManager
+from game_loop import run_game
 
-def test_chatbot():
-    #Test chatbot
-    my_bot = Bot(settings.agentes)
-    my_bot.start_chat()
-def test_consola():
-    # consola:
-    console = ConsoleBase(settings.main_name)
-    console.show_menu()
-   
+
 def main():
     print("Hello from agentcluedo!")
-    # dos_agentes_hablando()
-    # probar_detective()
-    juego = GameManager()
-    juego.run_game()
-     
+
+    llm = get_llm(
+        provider=settings.agentes,
+        ollama_model=settings.ollama_model,
+        openai_api_key=getattr(settings, "OPEN_AI_API", None),
+    )
+    juego = GameManager(llm)
+    run_game(juego)
+
+
 if __name__ == "__main__":
     main()

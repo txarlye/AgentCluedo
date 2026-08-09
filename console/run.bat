@@ -19,7 +19,7 @@ set "NEED_INSTALL=0"
 if not exist "%PYTHON_BIN%" set "NEED_INSTALL=1"
 if "%NEED_INSTALL%"=="1" goto :do_install
 
-"%PYTHON_BIN%" -c "import langchain, langchain_core, langchain_ollama, langchain_openai" >nul 2>nul
+"%PYTHON_BIN%" -c "import langchain, langchain_core, langchain_ollama, langchain_openai, cluedo_engine" >nul 2>nul
 if errorlevel 1 (
     echo [AVISO] El entorno virtual existente parece corrupto o incompleto. Se recreara.
     set "NEED_INSTALL=1"
@@ -38,6 +38,10 @@ rem --no-deps: requirements.txt es un "pip freeze" con versiones fijadas que
 rem            se contradicen si uv intenta resolverlas en modo estricto.
 rem --no-cache: evita wheels corruptos que puedan haber quedado en la cache.
 uv pip install -r "%REQ_FILE%" --python "%PYTHON_BIN%" --no-deps --no-cache
+if errorlevel 1 goto :install_fail
+
+echo Instalando el motor del juego ^(engine/^) en modo editable...
+uv pip install -e "%~dp0..\engine" --python "%PYTHON_BIN%" --no-cache
 if errorlevel 1 goto :install_fail
 
 :venv_ready

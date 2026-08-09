@@ -1,14 +1,13 @@
 from langchain_core.tools import StructuredTool
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate 
-from langchain_core.messages import HumanMessage,AIMessage
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import HumanMessage, AIMessage
 from pydantic import BaseModel, Field
 
-from .llm_factory           import get_llm
-from .bases.base_agent      import AgenteBase
-from .utils.prompt_loader   import load_prompt
-
+from .bases.base_agent import AgenteBase
+from .utils.prompt_loader import load_prompt
 from .detective_agent import crear_agente_detective
+from .models.turn_result import AgentTurnResult
+
 
 class InterrogarArgs(BaseModel):
     sospechoso: str = Field(description="Nombre del sospechoso (ej: 'Mayordomo', 'Heredera')")
@@ -19,45 +18,51 @@ class BuscarPistaArgs(BaseModel):
 
 class AcusarArgs(BaseModel):
     sospechoso: str = Field(description="Nombre del sospechoso que acusas")
-    
-    
+
+
 class GameManager:
     """
-    El Orquestador principal del juego
-    Contiene los estados del juego, sospechosos y el detective
+    El Orquestador principal del juego.
+    Contiene los estados del juego, sospechosos y el detective.
+    No hace ningún print()/input() — eso es responsabilidad de quien lo use
+    (la consola hoy, una API mañana).
     """
-    
-    def __init__(self):
+
+    def __init__(self, llm: BaseChatModel):
         print("Creando GameManager . . . \n")
-        
-        # 1. El cerebro (LLM)
-        self.llm = get_llm()
-        
+
+        # 1. El cerebro (LLM), ya construido por quien nos crea
+        self.llm = llm
+
         # 2. El historial del chat
         self.chat_history = []
-        
-        # 3. Creamos los sospechosos
+
+        # 3. Estado de fin de partida
+        self.game_over = False
+        self.game_result: str | None = None
+
+        # 4. Creamos los sospechosos
         self.mayordomo  = AgenteBase(
             nombre      = "Alfred (Mayordomo)",
             rol_prompt  = load_prompt("mayordomo.md"),
-            llm         = self.llm        
+            llm         = self.llm
         )
         self.heredera   = AgenteBase(
             nombre      = "Beatrice (Heredera)",
             rol_prompt  = load_prompt("heredera.md"),
-            llm         = self.llm        
+            llm         = self.llm
         )
-        
-        # 4. Diccionario para encontrar agentes por nombre
+
+        # 5. Diccionario para encontrar agentes por nombre
         self.sospechosos = {
             "mayordomo": self.mayordomo,
             "heredera" : self.heredera,
         }
-        
+
         herramientas_reales = [
             StructuredTool(
                 name="interrogar",
-                func=self.interrogar, 
+                func=self.interrogar,
                 description="Usa esta herramienta para interrogar a un sospechoso. Especifica el nombre (ej: 'Mayordomo', 'Heredera') y la pregunta.",
                 args_schema=InterrogarArgs
             ),
@@ -74,34 +79,30 @@ class GameManager:
                 args_schema=AcusarArgs
             )
         ]
-        
-        # 5. Creamos el Agente
+
+        # 6. Creamos el Agente
         self.detective = crear_agente_detective(
-            llm=self.llm, 
+            llm=self.llm,
             tools_list=herramientas_reales
         )
-        
-        
-        
-        
+
         print("GameManager Listo")
-        
-    
+
     def interrogar(self, sospechoso: str, pregunta: str) -> str:
         print(f"DEBUG: [Herramienta 'interrogar' REAL] -> {sospechoso}")
-        
+
         nombre_sospechoso = sospechoso.lower()
         if nombre_sospechoso not in self.sospechosos:
             return f"Error: No existe un sospechoso llamado '{sospechoso}'."
-        
+
         agente_sospechoso = self.sospechosos[nombre_sospechoso]
         respuesta_agente = agente_sospechoso.invoke(pregunta, history=self.chat_history)
-        
+
         return f"Respuesta de {sospechoso}: {respuesta_agente.dialogo}"
 
     def buscar_pista(self, ubicacion: str) -> str:
         print(f"DEBUG: [Herramienta 'buscar_pista' REAL] -> {ubicacion}")
-        
+
         if ubicacion.lower() == "biblioteca":
             return "Buscas en la biblioteca y encuentras un diario con una página arrancada."
         elif ubicacion.lower() == "cocina":
@@ -113,86 +114,45 @@ class GameManager:
 
     def acusar(self, sospechoso: str) -> str:
         print(f"DEBUG: [Herramienta 'acusar' REAL] -> {sospechoso}")
-        
+
+        self.game_over = True
+
         if sospechoso.lower() == "heredera": # (La 'verdad' secreta)
+            self.game_result = "won"
             return "¡Correcto! Has acusado a la Heredera. ¡HAS GANADO! Ella confiesa."
         else:
+            self.game_result = "lost"
             return f"Has acusado a {sospechoso}. Es inocente. ¡HAS PERDIDO!"
 
-    
-    def run_minigame1(self):
-        print("\n--- ¡Comienza el Juego! ---")
-        objetivo = """
-        Ha habido un asesinato en la mansión. 
-        La víctima es Lord Alistair. 
-        Los sospechosos son 'Mayordomo' y 'Heredera'.
-        La 'verdad' secreta del juego es que la 'Heredera' es la culpable.
-        Tu objetivo es descubrir la verdad usando tus herramientas. Empieza a investigar.
-        ¡Piensa y habla en español!
-        """
-        
-        # El prompt del Hub (hwchase17/openai-tools-agent) espera 'input'
+    def start_case(self) -> str:
+        """Texto de briefing inicial del caso. Sin print(): lo pinta quien nos use."""
+        return (
+            "--- ¡Comienza el Juego! ---\n"
+            "Ha habido un asesinato en la mansión.\n"
+            "La víctima es Lord Alistair.\n"
+            "Los sospechosos son 'Mayordomo' y 'Heredera'."
+        )
+
+    def step(self, human_input: str) -> AgentTurnResult:
+        """Ejecuta un turno del detective y devuelve el resultado estructurado."""
         resultado = self.detective.invoke({
-            "input": objetivo,
+            "input": human_input,
             "chat_history": self.chat_history
         })
-        
-        print("\n--- Respuesta Final del Detective ---")
-        print(resultado["output"])
-        print("--- Juego Terminado ---")
-        
-    def run_game(self):
-        """
-        Inicia el bucle de juego principal.
-        """
-        print("\n--- ¡Comienza el Juego! ---")
-        print("Ha habido un asesinato en la mansión.")
-        print("La víctima es Lord Alistair.")
-        print("Los sospechosos son 'Mayordomo' y 'Heredera'.")
-        print("Tú eres el Detective. Escribe tus órdenes.")
-        print("Escribe 'exit' para terminar el juego.")
-        print("---" * 10)
 
-        # El bucle de juego principal
-        while True:
-            try:
-                human_input = input("Tú (Detective): ")
-                
-                if human_input.lower() == 'exit':
-                    print("Saliendo del juego. ¡Adiós!")
-                    break
+        ai_response = resultado["output"]
 
-                # 1. Ejecutamos al agente
-                resultado = self.detective.invoke({
-                    "input": human_input,
-                    "chat_history": self.chat_history
-                })
-                
-                ai_response = resultado["output"]
-                
-                # 2. Imprimimos el DIÁLOGO/OBSERVACIÓN real (para el jugador)
-                if "intermediate_steps" in resultado and resultado["intermediate_steps"]:
-                    print("\n--- Diálogo/Observaciones ---")
-                    for action, observation in resultado["intermediate_steps"]:
-                        # 'observation' es el string que devuelven tus herramientas
-                        # ej: "Respuesta de Mayordomo: Estaba en mi habitación..."
-                        print(f"{observation}\n")
-                
-                # 3. Imprimimos el pensamiento final del Detective
-                print("--- Pensamiento del Detective ---")
-                print(ai_response)
-                print("---" * 10)
+        observations = []
+        if resultado.get("intermediate_steps"):
+            for _accion, observacion in resultado["intermediate_steps"]:
+                observations.append(observacion)
 
-                
-                # 4. ACTUALIZAMOS LA MEMORIA
-                self.chat_history.append(HumanMessage(content=human_input))
-                self.chat_history.append(AIMessage(content=ai_response))
-                
-            except EOFError:
-                print("\nSaliendo del juego. ¡Adiós!")
-                break
-            except KeyboardInterrupt:
-                print("\nSaliendo del juego. ¡Adiós!")
-                break
-        
-        
+        self.chat_history.append(HumanMessage(content=human_input))
+        self.chat_history.append(AIMessage(content=ai_response))
+
+        return AgentTurnResult(
+            final_response=ai_response,
+            observations=observations,
+            is_game_over=self.game_over,
+            result=self.game_result,
+        )

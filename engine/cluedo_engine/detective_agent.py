@@ -2,26 +2,19 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from typing import List
-from pathlib import Path
-from dotenv import load_dotenv
 import os
 
 def crear_agente_detective(llm: BaseChatModel, tools_list: List) -> AgentExecutor:
     """
     Esta 'fábrica' construye y devuelve el Agente Detective ejecutable.
     Recibe el LLM y la lista de herramientas reales.
-    """ 
+    """
     print("Fábrica: Creando agente detective...")
-    
+
     # Desactivar LangSmith tracing para evitar errores 403
     os.environ["LANGCHAIN_TRACING_V2"] = "false"
     os.environ["LANGCHAIN_API_KEY"] = ""
-    
-    # Asegurarnos de que las variables de entorno estén cargadas
-    env_path = Path(__file__).parent.parent / "settings" / ".env"
-    if env_path.exists():
-        load_dotenv(env_path, override=True)
-    
+
     # Prompt estándar de "Tool Calling", equivalente local a
     # hub.pull("hwchase17/openai-tools-agent"). Se define aquí directamente
     # en vez de descargarlo del Hub: el tracing se desactiva justo arriba

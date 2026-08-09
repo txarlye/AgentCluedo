@@ -39,6 +39,9 @@ create_venv() {
     # --no-cache: evita wheels corruptos que puedan haber quedado en la caché de uv.
     uv pip install -r "$REQ_FILE" --python "$PYTHON_BIN" --no-deps --no-cache \
         || fail "Fallo instalando dependencias."
+    info "Instalando el motor del juego (engine/) en modo editable..."
+    uv pip install -e "$SCRIPT_DIR/../engine" --python "$PYTHON_BIN" --no-cache \
+        || fail "Fallo instalando engine/."
 }
 
 PYTHON_BIN="$(venv_python)"
@@ -47,7 +50,7 @@ if [ -z "${PYTHON_BIN:-}" ]; then
     create_venv
 else
     # Comprobamos que el venv no esté roto (p.ej. por sincronización con Synology Drive)
-    if ! "$PYTHON_BIN" -c "import langchain, langchain_core, langchain_ollama, langchain_openai" >/dev/null 2>&1; then
+    if ! "$PYTHON_BIN" -c "import langchain, langchain_core, langchain_ollama, langchain_openai, cluedo_engine" >/dev/null 2>&1; then
         warn "El venv existente parece corrupto o incompleto. Se recreará."
         create_venv
     fi

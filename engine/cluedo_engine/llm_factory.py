@@ -1,22 +1,20 @@
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI 
-from settings.settings import settings
+from langchain_openai import ChatOpenAI
 
-def get_llm():
-    provider = settings.agentes
-    
+
+def get_llm(
+    provider: str,
+    *,
+    ollama_model: str | None = None,
+    openai_api_key: str | None = None,
+) -> BaseChatModel:
     if provider == "ollama":
-        print(f"✅ Usando Ollama (Modelo: {settings.ollama_model})")
-        # Creamos la instancia
-        llm = ChatOllama(model = settings.ollama_model)
-        
-        # forzamos a usar json
-        
-        return llm
-    
+        print(f"✅ Usando Ollama (Modelo: {ollama_model})")
+        return ChatOllama(model=ollama_model)
+
     if provider == "openai":
         print("✅ Usando OpenAI")
-        return ChatOpenAI(api_key=settings.OPEN_AI_API)
-    
-    else:
-        raise ValueError(f"Proveedor no soportado {provider}")
+        return ChatOpenAI(api_key=openai_api_key)
+
+    raise ValueError(f"Proveedor no soportado: {provider}")

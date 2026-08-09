@@ -1,0 +1,26 @@
+[project]
+name = "cluedo-engine"
+version = "0.1.0"
+description = "Motor de juego de AgentCluedo (agentes, GameManager), independiente de la consola y de cualquier backend"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain>=0.3",
+    "langchain-core>=0.3",
+    "langchain-ollama>=0.3",
+    "langchain-openai>=0.3",
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+bedrock = ["langchain-aws>=0.2"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["cluedo_engine*"]
+
+[tool.setuptools.package-data]
+cluedo_engine = ["prompts/*.md"]
