@@ -345,33 +345,39 @@ de ejemplo independientemente de esta reestructuración.
 
 ### 9. Orden de construcción sugerido
 
-Pensado para tocar credenciales cloud reales lo más tarde posible:
+**Revisado (2026-08-09):** el usuario quiere posponer crear/tocar la cuenta
+AWS todo lo posible, desarrollando y depurando en local con herramientas
+gratuitas hasta tener la demo lo más completa posible antes de "subirlo".
+Como `get_llm()` ya es un factory intercambiable, no hay ninguna razón
+técnica para que Bedrock vaya antes que el resto — se mueve al final,
+justo antes de la primera necesidad real de AWS. Todo lo demás (FastAPI,
+DynamoDB Local, Stripe test mode, magic-link) es gratis y no requiere
+cuenta AWS:
 
-1. Reestructura mecánica (§1) — mover ficheros, quitar los 4 imports
-   muertos de `main.py`, añadir la instalación editable del engine a
-   `run.sh`/`run.bat`. Verificar que la consola sigue jugando una partida
-   completa igual que antes (con Ollama).
-2. Extracción del motor (§2) — `step()`/`AgentTurnResult`, fix de
-   detección de fin de partida, fix de `prompt_loader.py`. La consola
-   sigue siendo el único consumidor; verificar paridad de comportamiento.
-3. Añadir la rama Bedrock (§3) y probarla a mano contra una cuenta AWS
-   real vía perfil personal — sin ECS todavía. Primer punto que toca AWS
-   real, pero solo un perfil CLI acotado a `bedrock:InvokeModel`.
-4. Construir `api/` en local (uvicorn) contra DynamoDB Local (Docker);
+1. ✅ Reestructura mecánica (§1).
+2. ✅ Extracción del motor (§2).
+3. Construir `api/` en local (uvicorn) contra **DynamoDB Local** (Docker,
+   sin cuenta AWS — es solo una imagen Docker) usando **Ollama** (no
+   Bedrock todavía) como LLM vía `cluedo_engine.llm_factory.get_llm`;
    implementar `/v1/games` + `/v1/games/{id}/turns` de extremo a extremo
-   con un usuario de auth-dev-mode — prueba el juego multi-turno por HTTP
-   sin ninguna dependencia real de AWS.
-5. Añadir magic-link en modo dev (§6) — sigue todo en local.
-6. Añadir Stripe en modo TEST (§5), usando `stripe listen --forward-to
-   localhost:.../v1/billing/webhook` para firmar webhooks en local sin
-   AWS. Probar el bucle completo: pedir enlace → pagar con tarjeta de
-   prueba → el webhook acredita en DynamoDB Local → empezar caso consume
-   crédito → jugar vía Bedrock.
-7. **Checkpoint de demo jugable de la Fase 1:** construir `api/static/demo.html`
-   (§7) y servirlo desde FastAPI. Recorrer el flujo completo desde el
-   navegador (sin curl): email → créditos → nuevo caso → varios turnos →
-   acusación → resultado. Esto es lo que se enseña como "Fase 1 terminada",
-   no el paso 6 por sí solo.
+   con un usuario de auth-dev-mode.
+4. Añadir magic-link en modo dev (§6) — sigue todo en local y gratis.
+5. Añadir Stripe en modo TEST (§5, gratis — no requiere tarjeta real ni
+   cuenta de pago, solo una cuenta Stripe gratuita), usando `stripe listen
+   --forward-to localhost:.../v1/billing/webhook` para firmar webhooks en
+   local. Mientras el usuario no tenga aún sus claves de prueba de Stripe,
+   la demo usa un endpoint de "conceder créditos" solo-dev (gateado por
+   `AUTH_DEV_MODE`) para no bloquear el resto.
+6. **Checkpoint de demo jugable de la Fase 1:** `api/static/demo.html`
+   (§7) servido desde FastAPI. Recorrido completo desde el navegador:
+   email → créditos (Stripe test o el atajo dev) → nuevo caso → varios
+   turnos vía Ollama → acusación → resultado. Esto es "Fase 1 terminada"
+   en local, cero coste, cero cuenta AWS.
+7. Solo ahora, con todo lo demás ya probado: añadir la rama Bedrock (§3)
+   y probarla a mano contra una cuenta AWS real vía perfil personal — sin
+   ECS todavía. Primer punto que toca AWS real, pero solo un perfil CLI
+   acotado a `bedrock:InvokeModel`, y deliberadamente el último paso antes
+   de necesitar AWS de verdad.
 8. Primer aprovisionamiento AWS real: crear las tablas DynamoDB y las
    entradas de Secrets Manager de verdad; apuntar el `api/` local (aún en
    local) a esos recursos reales — valida permisos IAM/esquemas antes de
@@ -381,19 +387,17 @@ Pensado para tocar credenciales cloud reales lo más tarde posible:
 10. Desplegar en ECS (Fargate o "Express Mode" — decidir aquí, no afecta al
     código de la app) detrás de un ALB con la task definition real (env
     vars + referencias a Secrets Manager + rol IAM de la tarea). El
-    `demo.html` del paso 7 queda servido también en producción — es la
-    demo pública de la Fase 1, no solo una herramienta de desarrollo.
+    `demo.html` del paso 6 queda servido también en producción.
 11. Pasar Stripe a modo live (nuevo secreto de webhook, price IDs reales)
     solo una vez validado el paso 10 en modo test contra el servicio ya
     desplegado.
 12. Solo con 1–11 sólidos: empezar Fase 1.5 (frontend React que sustituye
     a `demo.html`) / Fase 2 (imágenes) / Fase 3 (NFTs).
 
-Resultado: las credenciales AWS reales se tocan por primera vez en el paso
-3 (perfil personal, sin aprovisionar nada), crear infraestructura de
-verdad se deja para el paso 10, y ya en el paso 7 —completamente en
-local— hay una demo jugable en el navegador. 9 de los 12 pasos son
-enteramente locales.
+Resultado: los pasos 3-6 (backend, auth, pagos de prueba, demo jugable)
+son enteramente locales y gratuitos — AWS no aparece hasta el paso 7, y
+solo como un perfil personal de prueba, no como aprovisionamiento real
+(eso queda en el paso 8). 10 de los 12 pasos no tocan AWS en absoluto.
 
 ### Decisiones abiertas (no se asumen, se preguntan cuando toque implementar)
 
@@ -404,7 +408,7 @@ enteramente locales.
   Stripe y el mapeo `price_id → créditos`).
 - Proveedor de email para magic-link: SES vs Postmark/Resend/SendGrid.
 - Fargate vs ECS "Express Mode" — solo afecta a `infra/`, se puede decidir
-  tan tarde como el paso 9 del orden de construcción.
+  tan tarde como el paso 10 del orden de construcción.
 
 ## Archivos críticos
 
@@ -427,18 +431,22 @@ enteramente locales.
   con Ollama, incluyendo una acusación correcta e incorrecta, y confirmar
   que el comportamiento (texto, flujo, fin de partida) es idéntico al
   actual — más el fix de que el juego ahora sí termina tras acusar.
-- **Fase 1, paso 3**: probar la rama Bedrock de `llm_factory.get_llm()` con
+- **Fase 1, paso 3**: con `uvicorn` local + DynamoDB Local (Docker) +
+  Ollama, recorrer por curl/Postman: crear usuario dev → `POST /v1/games`
+  → varios `POST /v1/games/{id}/turns` → acusación → `is_game_over=true`
+  con el resultado correcto.
+- **Fase 1, paso 4-5**: añadido magic-link (modo dev) y Stripe test mode
+  (o el atajo de conceder créditos en dev mientras no haya claves de
+  Stripe todavía): pedir enlace → conseguir créditos → jugar, todo por
+  curl/Postman.
+- **Fase 1, paso 6 (checkpoint de demo)**: repetir ese mismo recorrido
+  pero desde `api/static/demo.html` en el navegador, sin curl — email,
+  créditos, caso, turnos, acusación y resultado, todo clicable. Esto es
+  lo que se prueba "ahora" en local, sin AWS.
+- **Fase 1, paso 7**: probar la rama Bedrock de `llm_factory.get_llm()` con
   un script suelto o test manual contra una cuenta AWS real (perfil
-  personal), confirmando respuesta válida de `ChatBedrock`.
-- **Fase 1, paso 4-6**: con `uvicorn` local + DynamoDB Local + `stripe
-  listen`, recorrer el flujo completo por curl/Postman: pedir magic-link
-  (modo dev) → crear checkout session → pagar con tarjeta de prueba de
-  Stripe → confirmar que el webhook acredita en DynamoDB Local → `POST
-  /v1/games` consume el crédito → varios `POST /v1/games/{id}/turns` →
-  acusación → `is_game_over=true` con el resultado correcto.
-- **Fase 1, paso 7 (checkpoint de demo):** repetir ese mismo recorrido pero
-  desde `api/static/demo.html` en el navegador, sin curl — email, compra,
-  caso, turnos, acusación y resultado, todo clicable.
+  personal), confirmando respuesta válida de `ChatBedrock`, y luego el
+  mismo recorrido del paso 6 pero con Bedrock en vez de Ollama.
 - **Fase 1, paso 8-10**: repetir el recorrido completo otra vez contra
   recursos AWS reales (tablas/Secrets Manager reales), luego contenedor
   local, luego el servicio ya desplegado en ECS tras el paso 10 —
