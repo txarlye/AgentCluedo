@@ -5,10 +5,13 @@ description = "Motor de juego de AgentCluedo (agentes, GameManager), independien
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "langchain>=0.3",
-    "langchain-core>=0.3",
-    "langchain-ollama>=0.3",
-    "langchain-openai>=0.3",
+    # Fijado a estas versiones exactas (no ">=0.3"): langchain 1.x reorganizó
+    # AgentExecutor/create_tool_calling_agent fuera de langchain.agents y
+    # rompe detective_agent.py. Mismas versiones que console/requirements.txt.
+    "langchain==0.3.27",
+    "langchain-core==0.3.79",
+    "langchain-ollama==0.3.10",
+    "langchain-openai==0.3.35",
     "pydantic>=2",
 ]
 

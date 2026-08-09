@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>AgentCluedo — demo</title>
+<style>
+  body { font-family: monospace; max-width: 700px; margin: 2rem auto; padding: 0 1rem; }
+  fieldset { margin-bottom: 1.5rem; }
+  #observations, #final_response { white-space: pre-wrap; background: #f0f0f0; padding: 0.5rem; }
+  #result_banner { font-weight: bold; padding: 0.5rem; margin-top: 0.5rem; }
+  #result_banner.won { background: #cfe8cf; }
+  #result_banner.lost { background: #e8cfcf; }
+  input[type=text] { width: 60%; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<h1>🕵️ AgentCluedo — demo local (Fase 1, sin estilos)</h1>
+
+<fieldset id="auth_box">
+  <legend>1. Identificarte</legend>
+  <input type="email" id="email" placeholder="tu@email.com">
+  <button id="request_link_btn">Pedir enlace</button>
+  <div id="auth_status"></div>
+</fieldset>
+
+<fieldset id="credits_box" class="hidden">
+  <legend>2. Créditos</legend>
+  <div>Saldo: <span id="credits_balance">-</span></div>
+  <button id="dev_grant_btn">Conceder 5 créditos (dev)</button>
+  <button id="stripe_checkout_btn">Comprar créditos (Stripe)</button>
+</fieldset>
+
+<fieldset id="game_box" class="hidden">
+  <legend>3. Caso</legend>
+  <button id="new_game_btn">Nuevo caso</button>
+  <div id="briefing"></div>
+</fieldset>
+
+<fieldset id="turn_box" class="hidden">
+  <legend>4. Investigar</legend>
+  <input type="text" id="turn_input" placeholder="pregunta al mayordomo, busca pistas, acusa...">
+  <button id="send_turn_btn">Enviar</button>
+  <div id="observations"></div>
+  <div><strong>Pensamiento del detective:</strong></div>
+  <div id="final_response"></div>
+  <div id="result_banner" class="hidden"></div>
+</fieldset>
+
+<script>
+let sessionToken = null;
+let currentGameId = null;
+
+function authHeaders() {
+  return { "Authorization": "Bearer " + sessionToken, "Content-Type": "application/json" };
+}
+
+document.getElementById("request_link_btn").onclick = async () => {
+  const email = document.getElementById("email").value;
+  if (!email) return;
+
+  const res = await fetch("/v1/auth/request-link", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    document.getElementById("auth_status").textContent = "Error: " + JSON.stringify(data);
+    return;
+  }
+
+  // Modo dev: el link-token viene directo en la respuesta, sin email real.
+  const verifyRes = await fetch("/v1/auth/verify?token=" + encodeURIComponent(data.dev_token));
+  const verifyData = await verifyRes.json();
+  if (!verifyRes.ok) {
+    document.getElementById("auth_status").textContent = "Error: " + JSON.stringify(verifyData);
+    return;
+  }
+
+  sessionToken = verifyData.session_token;
+  document.getElementById("auth_status").textContent = "Conectado como " + verifyData.user_id;
+  document.getElementById("credits_balance").textContent = verifyData.credits_balance;
+  document.getElementById("credits_box").classList.remove("hidden");
+  document.getElementById("game_box").classList.remove("hidden");
+};
+
+async function refreshCredits() {
+  const res = await fetch("/v1/billing/credits", { headers: authHeaders() });
+  const data = await res.json();
+  document.getElementById("credits_balance").textContent = data.credits_balance;
+}
+
+document.getElementById("dev_grant_btn").onclick = async () => {
+  await fetch("/v1/billing/dev-grant-credits", {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ credits: 5 }),
+  });
+  refreshCredits();
+};
+
+document.getElementById("stripe_checkout_btn").onclick = async () => {
+  const res = await fetch("/v1/billing/checkout-session", { method: "POST", headers: authHeaders() });
+  const data = await res.json();
+  if (!res.ok) {
+    alert("Stripe no disponible todavía: " + (data.detail || JSON.stringify(data)));
+    return;
+  }
+  window.location.href = data.checkout_url;
+};
+
+document.getElementById("new_game_btn").onclick = async () => {
+  const res = await fetch("/v1/games", { method: "POST", headers: authHeaders() });
+  const data = await res.json();
+  if (!res.ok) {
+    alert("No se pudo crear el caso: " + (data.detail || JSON.stringify(data)));
+    return;
+  }
+  currentGameId = data.game_id;
+  document.getElementById("briefing").textContent = data.briefing;
+  document.getElementById("credits_balance").textContent = data.credits_balance;
+  document.getElementById("turn_box").classList.remove("hidden");
+  document.getElementById("result_banner").classList.add("hidden");
+  document.getElementById("observations").textContent = "";
+  document.getElementById("final_response").textContent = "";
+};
+
+document.getElementById("send_turn_btn").onclick = async () => {
+  const input = document.getElementById("turn_input");
+  const text = input.value;
+  if (!text || !currentGameId) return;
+  input.value = "";
+
+  const res = await fetch(`/v1/games/${currentGameId}/turns`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ input: text }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    alert("Error: " + (data.detail || JSON.stringify(data)));
+    return;
+  }
+
+  document.getElementById("observations").textContent = data.observations.join("\n\n");
+  document.getElementById("final_response").textContent = data.final_response;
+
+  if (data.is_game_over) {
+    const banner = document.getElementById("result_banner");
+    banner.classList.remove("hidden", "won", "lost");
+    banner.classList.add(data.result === "won" ? "won" : "lost");
+    banner.textContent = data.result === "won" ? "¡Caso resuelto! Has ganado." : "Caso cerrado. Has perdido.";
+    input.disabled = true;
+    document.getElementById("send_turn_btn").disabled = true;
+  }
+};
+</script>
+</body>
+</html>
